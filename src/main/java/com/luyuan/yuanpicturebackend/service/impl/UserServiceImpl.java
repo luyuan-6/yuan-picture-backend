@@ -136,7 +136,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return null;
         }
         LoginUserVO loginUserVO = new LoginUserVO();
-        BeanUtils.copyProperties(user, loginUserVO);
+        BeanUtil.copyProperties(user, loginUserVO);
         return loginUserVO;
     }
 
