@@ -8,7 +8,7 @@ import com.luyuan.yuanpicturebackend.Exeception.BusinessException;
 import com.luyuan.yuanpicturebackend.Exeception.ErrorCode;
 import com.luyuan.yuanpicturebackend.Exeception.ThrowUtils;
 import com.luyuan.yuanpicturebackend.config.CosClientConfig;
-import com.luyuan.yuanpicturebackend.model.dto.picture.UploadPictureResult;
+import com.luyuan.yuanpicturebackend.model.dto.file.UploadPictureResult;
 import com.qcloud.cos.model.PutObjectResult;
 
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;

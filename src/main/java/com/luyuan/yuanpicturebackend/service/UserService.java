@@ -13,7 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
-* @author lhd666
+* @author luyuan
 * @description 针对表【user(用户)】的数据库操作Service
 * @createDate 2025-05-09 15:26:05
 */
@@ -71,4 +71,11 @@ public interface UserService extends IService<User> {
      * @return
      */
     String getEncryptPassword(String password);
+
+    /**
+     * 是否为管理员
+     * @param user
+     * @return
+     */
+    boolean isAdmin(User user);
 }

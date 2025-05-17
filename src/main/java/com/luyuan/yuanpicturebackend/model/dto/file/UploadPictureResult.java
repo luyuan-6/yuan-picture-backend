@@ -1,4 +1,4 @@
-package com.luyuan.yuanpicturebackend.model.dto.picture;
+package com.luyuan.yuanpicturebackend.model.dto.file;
 
 import lombok.Data;
 
