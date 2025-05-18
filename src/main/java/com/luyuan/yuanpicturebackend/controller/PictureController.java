@@ -14,12 +14,10 @@ import com.luyuan.yuanpicturebackend.common.DeleteRequest;
 import com.luyuan.yuanpicturebackend.common.ResultUtils;
 import com.luyuan.yuanpicturebackend.constant.UserConstant;
 import com.luyuan.yuanpicturebackend.manager.CosManager;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureEditRequest;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureQueryRequest;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUpdateRequest;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadRequest;
+import com.luyuan.yuanpicturebackend.model.dto.picture.*;
 import com.luyuan.yuanpicturebackend.model.entity.Picture;
 import com.luyuan.yuanpicturebackend.model.entity.User;
+import com.luyuan.yuanpicturebackend.model.enums.PictureReviewStatusEnum;
 import com.luyuan.yuanpicturebackend.model.vo.PictureTagCategory;
 import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
 import com.luyuan.yuanpicturebackend.service.PictureService;
@@ -53,7 +51,6 @@ public class PictureController {
     private PictureService  pictureService;
 
 
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @PostMapping("/upload")
     public BaseResponse<PictureVO> uploadPicture(@RequestPart("file")MultipartFile multipartFile,
                                                   PictureUploadRequest pictureUploadRequest, HttpServletRequest request) {
@@ -94,7 +91,7 @@ public class PictureController {
      */
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @PostMapping("/update")
-    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest) {
+    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest , HttpServletRequest request) {
         if (pictureUpdateRequest == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -112,6 +109,9 @@ public class PictureController {
         picture.setTags(JSONUtil.toJsonStr(pictureUpdateRequest.getTags()));
         // 校验图片元信息
         pictureService.validPicture(picture);
+        // 补充审核参数
+        User loginUser = userService.getLoginUser(request);
+        pictureService.fillReviewParams(picture, loginUser);
         // 操作数据库
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.PARAMS_ERROR, "更新图片失败");
@@ -172,6 +172,8 @@ public class PictureController {
         // 1.创建分页实例对象
         Page<Picture> picture = new Page<>(current, pageSize);
         // 2.创建查询条件对象
+        // 普通用户默认只能查看已过审的数据
+        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
         QueryWrapper<Picture> queryWrapper = pictureService.getQueryWrapper(pictureQueryRequest);
         // 3.查询数据库
         Page<Picture> picturePage = pictureService.page(picture, queryWrapper);
@@ -199,6 +201,8 @@ public class PictureController {
         if (!oldPicture.getUserId().equals(picture.getUserId()) && !userService.isAdmin(loginUser)){
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
+        // 补充审核参数
+        pictureService.fillReviewParams(picture, loginUser);
         // 操作数据库对图片进行编辑
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -215,5 +219,15 @@ public class PictureController {
         return ResultUtils.success(pictureTagCategory);
     }
 
+    /**
+     * 审核图片
+     */
+    @PostMapping("/review")
+    public BaseResponse<Boolean> doPictureReview(@RequestBody PictureReviewRequest pictureReviewRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(pictureReviewRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        pictureService.doPictureReview(pictureReviewRequest, loginUser);
+        return ResultUtils.success(true);
+    }
 
 }
