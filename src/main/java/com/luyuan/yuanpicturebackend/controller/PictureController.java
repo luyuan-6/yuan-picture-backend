@@ -4,7 +4,6 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.databind.ser.Serializers;
 import com.luyuan.yuanpicturebackend.Exeception.BusinessException;
 import com.luyuan.yuanpicturebackend.Exeception.ErrorCode;
 import com.luyuan.yuanpicturebackend.Exeception.ThrowUtils;
@@ -13,7 +12,6 @@ import com.luyuan.yuanpicturebackend.common.BaseResponse;
 import com.luyuan.yuanpicturebackend.common.DeleteRequest;
 import com.luyuan.yuanpicturebackend.common.ResultUtils;
 import com.luyuan.yuanpicturebackend.constant.UserConstant;
-import com.luyuan.yuanpicturebackend.manager.CosManager;
 import com.luyuan.yuanpicturebackend.model.dto.picture.*;
 import com.luyuan.yuanpicturebackend.model.entity.Picture;
 import com.luyuan.yuanpicturebackend.model.entity.User;
@@ -22,20 +20,12 @@ import com.luyuan.yuanpicturebackend.model.vo.PictureTagCategory;
 import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
 import com.luyuan.yuanpicturebackend.service.PictureService;
 import com.luyuan.yuanpicturebackend.service.UserService;
-import com.qcloud.cos.model.COSObject;
-import com.qcloud.cos.model.COSObjectInputStream;
-import com.qcloud.cos.utils.IOUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Array;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -48,14 +38,27 @@ public class PictureController {
     private UserService userService;
 
     @Resource
-    private PictureService  pictureService;
+    private PictureService pictureService;
 
 
+    /**
+     * 上传图片（可重新上传）
+     */
     @PostMapping("/upload")
-    public BaseResponse<PictureVO> uploadPicture(@RequestPart("file")MultipartFile multipartFile,
-                                                  PictureUploadRequest pictureUploadRequest, HttpServletRequest request) {
+    public BaseResponse<PictureVO> uploadPicture(@RequestPart("file") MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         PictureVO pictureVO = pictureService.uploadPicture(multipartFile, pictureUploadRequest, loginUser);
+        return ResultUtils.success(pictureVO);
+    }
+
+    /**
+     * 通过 URL 上传图片（可重新上传）
+     */
+    @PostMapping("/upload/url")
+    public BaseResponse<PictureVO> uploadPictureByUrl(PictureUploadRequest pictureUploadRequest, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        String fileUrl = pictureUploadRequest.getFileUrl();
+        PictureVO pictureVO = pictureService.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
         return ResultUtils.success(pictureVO);
     }
 
@@ -64,7 +67,7 @@ public class PictureController {
      */
     @PostMapping("/delete")
     public BaseResponse<Boolean> deletePicture(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
-        if (deleteRequest == null || deleteRequest.getId() <= 0){
+        if (deleteRequest == null || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
@@ -76,7 +79,7 @@ public class PictureController {
         Picture oldPicture = pictureService.getById(id);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         // 仅限本人或管理员可以删除
-        if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)){
+        if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         // 操作数据库
@@ -86,17 +89,16 @@ public class PictureController {
     }
 
     /**
-     *
      * 跟新图片
      */
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @PostMapping("/update")
-    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest , HttpServletRequest request) {
-        if (pictureUpdateRequest == null){
+    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest, HttpServletRequest request) {
+        if (pictureUpdateRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         long id = pictureUpdateRequest.getId();
-        if (id <= 0){
+        if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         // 判断是否存在
@@ -117,6 +119,7 @@ public class PictureController {
         ThrowUtils.throwIf(!result, ErrorCode.PARAMS_ERROR, "更新图片失败");
         return ResultUtils.success(true);
     }
+
     /**
      * 根据 id 获取图片（仅管理员可用）
      */
@@ -146,6 +149,7 @@ public class PictureController {
 
     /**
      * 分页获取图片列表(管理员可用)
+     *
      * @param pictureQueryRequest
      * @return
      */
@@ -163,6 +167,9 @@ public class PictureController {
         return ResultUtils.success(picturePage);
     }
 
+    /**
+     * 分页获取图片列表（封装类）
+     */
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<PictureVO>> listPictureVOByPage(@RequestBody PictureQueryRequest pictureQueryRequest, HttpServletRequest request) {
         int current = pictureQueryRequest.getCurrent();
@@ -182,7 +189,7 @@ public class PictureController {
 
     @PostMapping("/edit")
     public BaseResponse<Boolean> editPicture(@RequestBody PictureEditRequest pictureEditRequest, HttpServletRequest request) {
-        if (pictureEditRequest == null || pictureEditRequest.getId() <= 0){
+        if (pictureEditRequest == null || pictureEditRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         // 实体类和DTO类进行转换
@@ -198,7 +205,7 @@ public class PictureController {
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或者管理员可编辑
         User loginUser = userService.getLoginUser(request);
-        if (!oldPicture.getUserId().equals(picture.getUserId()) && !userService.isAdmin(loginUser)){
+        if (!oldPicture.getUserId().equals(picture.getUserId()) && !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         // 补充审核参数
@@ -213,7 +220,7 @@ public class PictureController {
     public BaseResponse<PictureTagCategory> listPictureTagCategory() {
         PictureTagCategory pictureTagCategory = new PictureTagCategory();
         List<String> tagList = Arrays.asList("热门", "搞笑", "生活", "高清", "艺术", "校园", "背景", "简历", "创意");
-        List<String> categoryList  = Arrays.asList("模板", "电商", "表情包", "素材", "海报");
+        List<String> categoryList = Arrays.asList("模板", "电商", "表情包", "素材", "海报");
         pictureTagCategory.setTagList(tagList);
         pictureTagCategory.setCategoryList(categoryList);
         return ResultUtils.success(pictureTagCategory);
