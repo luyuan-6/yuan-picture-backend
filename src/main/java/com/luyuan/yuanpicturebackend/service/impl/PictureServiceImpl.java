@@ -4,6 +4,8 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.text.CharSequenceUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -17,6 +19,7 @@ import com.luyuan.yuanpicturebackend.mapper.PictureMapper;
 import com.luyuan.yuanpicturebackend.model.dto.file.UploadPictureResult;
 import com.luyuan.yuanpicturebackend.model.dto.picture.PictureQueryRequest;
 import com.luyuan.yuanpicturebackend.model.dto.picture.PictureReviewRequest;
+import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadByBatchRequest;
 import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadRequest;
 import com.luyuan.yuanpicturebackend.model.entity.Picture;
 import com.luyuan.yuanpicturebackend.model.entity.User;
@@ -25,10 +28,16 @@ import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
 import com.luyuan.yuanpicturebackend.model.vo.UserVO;
 import com.luyuan.yuanpicturebackend.service.PictureService;
 import com.luyuan.yuanpicturebackend.service.UserService;
+import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +50,7 @@ import java.util.stream.Collectors;
  * @createDate 2025-05-14 17:45:39
  */
 @Service
+@Slf4j
 public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> implements PictureService {
 
     @Resource
@@ -112,7 +122,17 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         // 构造要入库的图片信息
         Picture picture = new Picture();
         picture.setUrl(uploadPictureResult.getUrl());
-        picture.setName(uploadPictureResult.getPicName());
+        String picName = uploadPictureResult.getPicName();
+        if (pictureUploadRequest != null && CharSequenceUtil.isNotBlank(pictureUploadRequest.getPicName())){
+            picName = pictureUploadRequest.getPicName();
+        }
+        if (pictureUploadRequest != null && CharSequenceUtil.isNotBlank(pictureUploadRequest.getCategory())){
+            picture.setCategory(pictureUploadRequest.getCategory());
+        }
+        if (pictureUploadRequest != null && CharSequenceUtil.isNotBlank(pictureUploadRequest.getTags())){
+            picture.setTags(pictureUploadRequest.getTags());
+        }
+        picture.setName(picName);
         picture.setPicSize(uploadPictureResult.getPicSize());
         picture.setPicWidth(uploadPictureResult.getPicWidth());
         picture.setPicHeight(uploadPictureResult.getPicHeight());
@@ -266,6 +286,69 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             // 非管理员，创建或编辑都要改为待审核
             picture.setReviewStatus(PictureReviewStatusEnum.REVIEWING.getValue());
         }
+    }
+
+    @Override
+    public Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser) {
+        String searchText = pictureUploadByBatchRequest.getSearchText();
+        Integer count = pictureUploadByBatchRequest.getCount();
+        if (count <= 0 || count > 30) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数count错误");
+        }
+        // 数据源地址
+        String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1", searchText);
+        Document document = null;
+        try {
+            document = Jsoup.connect(fetchUrl).get();
+        } catch (IOException e) {
+            log.info("Jsoup 获取图片失败", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Jsoup 获取图片失败");
+        }
+        Element div = document.getElementsByClass("dgControl").first();
+        if (ObjectUtil.isNull(div)) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "获取 document 元素失败");
+        }
+        Elements imgElementList = div.select("img.mimg");
+        int uploadSuccessCount = 0;
+        for (Element imgElement : imgElementList) {
+            String imgUrl = imgElement.attr("src");
+            if (CharSequenceUtil.isBlank(imgUrl)) {
+                log.info("图片地址为空 已跳过: {}", imgUrl);
+                continue;
+            }
+            // 处理图片上传地址 防止出现转移问题
+            int questionMarkIndex = imgUrl.indexOf("?");
+            if (questionMarkIndex > -1) {
+                imgUrl = imgUrl.substring(0, questionMarkIndex);
+            }
+            // 上传图片
+            PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+
+            if (CharSequenceUtil.isNotBlank(pictureUploadByBatchRequest.getNamePrefix())) {
+                pictureUploadRequest.setPicName(pictureUploadByBatchRequest.getNamePrefix() + "_" + uploadSuccessCount + 1);
+            }
+            if (CharSequenceUtil.isNotBlank(pictureUploadByBatchRequest.getCategory())) {
+                pictureUploadRequest.setCategory(pictureUploadByBatchRequest.getCategory());
+            }
+            if (CharSequenceUtil.isNotBlank(JSONUtil.toJsonStr(pictureUploadByBatchRequest.getTags()))) {
+                pictureUploadRequest.setTags(JSONUtil.toJsonStr(pictureUploadByBatchRequest.getTags()));
+            }
+
+            try {
+                PictureVO pictureVO = this.uploadPicture(imgUrl, pictureUploadRequest, loginUser);
+                log.info("图片上传成功: id =  {}", pictureVO.getId());
+                uploadSuccessCount++;
+            } catch (Exception e) {
+                log.error("图片上传失败: {}", imgUrl);
+                continue;
+            }
+            // 当前上传的图片 exceeds the maximum number
+            if (uploadSuccessCount >= count){
+                break;
+            }
+
+        }
+        return uploadSuccessCount;
     }
 }
 

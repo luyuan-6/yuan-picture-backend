@@ -3,24 +3,25 @@ package com.luyuan.yuanpicturebackend.model.dto.picture;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.List;
 
 @Data
-public class PictureUploadRequest implements Serializable {
+public class PictureUploadByBatchRequest implements Serializable {
 
     /**
-     * 图片 id（用于修改）
+     * 搜索词
      */
-    private Long id;
+    private String searchText;
 
     /**
-     * 文件地址
+     * 抓取数量
      */
-    private String fileUrl;
+    private Integer count = 10;
 
     /**
-     * 图片名称
+     * 名称前缀
      */
-    private String picName;
+    private String namePrefix;
 
     /**
      * 分类
@@ -28,9 +29,9 @@ public class PictureUploadRequest implements Serializable {
     private String category;
 
     /**
-     * 标签（JSON 数组）
+     * 标签
      */
-    private String tags;
+    private List<String> tags;
 
     private static final long serialVersionUID = 1L;
 }

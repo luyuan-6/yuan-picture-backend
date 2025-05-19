@@ -5,24 +5,24 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.luyuan.yuanpicturebackend.model.dto.picture.PictureQueryRequest;
 import com.luyuan.yuanpicturebackend.model.dto.picture.PictureReviewRequest;
+import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadByBatchRequest;
 import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadRequest;
 import com.luyuan.yuanpicturebackend.model.entity.Picture;
 import com.luyuan.yuanpicturebackend.model.entity.User;
 import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 
 /**
-* @author luyuan
-* @description 针对表【picture(图片)】的数据库操作Service
-* @createDate 2025-05-14 17:45:39
-*/
+ * @author luyuan
+ * @description 针对表【picture(图片)】的数据库操作Service
+ * @createDate 2025-05-14 17:45:39
+ */
 public interface PictureService extends IService<Picture> {
 
 
-
     void validPicture(Picture picture);
+
     /**
      * 上传图片
      *
@@ -32,6 +32,7 @@ public interface PictureService extends IService<Picture> {
      * @return
      */
     PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser);
+
     /**
      * 获取查询对象
      *
@@ -73,4 +74,13 @@ public interface PictureService extends IService<Picture> {
      * @param loginUser
      */
     void fillReviewParams(Picture picture, User loginUser);
+
+    /**
+     * 批量抓取和创建图片
+     *
+     * @param pictureUploadByBatchRequest
+     * @param loginUser
+     * @return 成功创建的图片数
+     */
+    Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser);
 }
