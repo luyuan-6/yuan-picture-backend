@@ -10,6 +10,7 @@ import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadRequest;
 import com.luyuan.yuanpicturebackend.model.entity.Picture;
 import com.luyuan.yuanpicturebackend.model.entity.User;
 import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
+import org.springframework.scheduling.annotation.Async;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -83,4 +84,12 @@ public interface PictureService extends IService<Picture> {
      * @return 成功创建的图片数
      */
     Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser);
+
+
+    /**
+     * 清理图片文件
+     * @param oldPicture
+     */
+    void clearPictureFile(Picture oldPicture);
+
 }

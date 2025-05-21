@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.luyuan.yuanpicturebackend.Exeception.BusinessException;
 import com.luyuan.yuanpicturebackend.Exeception.ErrorCode;
 import com.luyuan.yuanpicturebackend.Exeception.ThrowUtils;
+import com.luyuan.yuanpicturebackend.manager.CosManager;
 import com.luyuan.yuanpicturebackend.manager.upload.FilePictureUpload;
 import com.luyuan.yuanpicturebackend.manager.upload.PictureUploadTemplate;
 import com.luyuan.yuanpicturebackend.manager.upload.UrlPictureUpload;
@@ -33,11 +34,14 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +65,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
     @Resource
     private UrlPictureUpload urlPictureUpload;
+
+    @Resource
+    private CosManager cosManager;
 
     @Override
     public void validPicture(Picture picture) {
@@ -122,6 +129,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         // 构造要入库的图片信息
         Picture picture = new Picture();
         picture.setUrl(uploadPictureResult.getUrl());
+        picture.setThumbnailUrl(uploadPictureResult.getThumbnailUrl());
         String picName = uploadPictureResult.getPicName();
         if (pictureUploadRequest != null && CharSequenceUtil.isNotBlank(pictureUploadRequest.getPicName())){
             picName = pictureUploadRequest.getPicName();
@@ -349,6 +357,44 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
         }
         return uploadSuccessCount;
+    }
+
+    @Override
+    @Async
+    public void clearPictureFile(Picture oldPicture) {
+        if (oldPicture == null) {
+            log.error("[clearPictureFile] oldPicture is null");
+            return;
+        }
+        // 判断该图片是否被多条记录使用 分片上传才会用到这个逻辑 目前没有使用分块上传
+        String url = oldPicture.getUrl();
+        Long count = this.lambdaQuery()
+                .eq(Picture::getUrl, url)
+                .count();
+        // 有不只一条记录用到了该图片 不清理
+        if (count > 1) {
+            return;
+        }
+        // 注意，这里的 url 包含了域名，实际上只要传 key 值（存储路径）就够了
+        try {
+            // 提取路径部分
+            // 清理原图
+            String originPicPath = new URL(url).getPath();
+            if (originPicPath != null){
+                cosManager.deleteObject(originPicPath);
+            }
+
+            // 清理缩略图
+            String thumbnailUrl = oldPicture.getThumbnailUrl();
+            if (thumbnailUrl != null) {
+                String thumbnailPicPath = new URL(thumbnailUrl).getPath();
+                cosManager.deleteObject(thumbnailPicPath);
+            }
+
+        }catch (MalformedURLException e){
+            log.error("处理图片删除时，格式错误。 图片URL : {}", url);
+        }
+
     }
 }
 

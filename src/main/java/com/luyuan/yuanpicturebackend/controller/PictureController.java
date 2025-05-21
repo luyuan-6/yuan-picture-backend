@@ -102,6 +102,8 @@ public class PictureController {
         // 操作数据库
         boolean result = pictureService.removeById(id);
         ThrowUtils.throwIf(!result, ErrorCode.PARAMS_ERROR, "删除图片失败");
+        // 清理对象存储里的文件
+        pictureService.clearPictureFile(oldPicture);
         return ResultUtils.success(true);
     }
 
@@ -134,6 +136,10 @@ public class PictureController {
         // 操作数据库
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.PARAMS_ERROR, "更新图片失败");
+        // 清理对象存储里的文件
+        if (!oldPicture.getUrl().equals(picture.getUrl())) {
+            pictureService.clearPictureFile(oldPicture);
+        }
         return ResultUtils.success(true);
     }
 
