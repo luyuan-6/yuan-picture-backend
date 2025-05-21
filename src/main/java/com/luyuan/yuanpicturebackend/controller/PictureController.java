@@ -1,9 +1,12 @@
 package com.luyuan.yuanpicturebackend.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.luyuan.yuanpicturebackend.Exeception.BusinessException;
 import com.luyuan.yuanpicturebackend.Exeception.ErrorCode;
 import com.luyuan.yuanpicturebackend.Exeception.ThrowUtils;
@@ -21,6 +24,10 @@ import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
 import com.luyuan.yuanpicturebackend.service.PictureService;
 import com.luyuan.yuanpicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,6 +35,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/picture")
@@ -40,6 +48,15 @@ public class PictureController {
     @Resource
     private PictureService pictureService;
 
+    @Autowired
+    private StringRedisTemplate  stringRedisTemplate;
+
+    private final Cache<String, String> LOCAL_CACHE = Caffeine.newBuilder()
+            //  缓存 1 万条
+            .maximumSize(10000L)
+            // 缓存5分钟
+            .expireAfterWrite(5L, TimeUnit.MINUTES)
+            .build();
 
     /**
      * 上传图片（可重新上传）
@@ -185,6 +202,61 @@ public class PictureController {
         // 3.查询数据库
         Page<Picture> picturePage = pictureService.page(picture, queryWrapper);
         return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
+    }
+
+    /**
+     * 分页获取图片列表（封装类 带缓存）
+     */
+    @PostMapping("/list/page/vo/cache")
+    public BaseResponse<Page<PictureVO>> listPictureVOByPageWithCache(@RequestBody PictureQueryRequest pictureQueryRequest, HttpServletRequest request) {
+        int current = pictureQueryRequest.getCurrent();
+        int pageSize = pictureQueryRequest.getPageSize();
+        // 限制爬虫
+        ThrowUtils.throwIf(pageSize > 20, ErrorCode.PARAMS_ERROR, "每页条数不能超过20");
+        // 1.创建分页实例对象
+        Page<Picture> picture = new Page<>(current, pageSize);
+        // 2.创建查询条件对象
+        // 普通用户默认只能查看已过审的数据
+        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+        QueryWrapper<Picture> queryWrapper = pictureService.getQueryWrapper(pictureQueryRequest);
+
+        // 构建缓存
+        String queryCondition = JSONUtil.toJsonStr(pictureQueryRequest);
+        String hashKey = DigestUtils.md5DigestAsHex(queryCondition.getBytes());
+        String cacheKey = "listPictureVOByPageWithCache:" + hashKey;
+        // 1. 从本地缓存中获取缓存
+        String cachedValue = LOCAL_CACHE.getIfPresent(cacheKey);
+        if (cachedValue != null) {
+            // 如果缓存命中，返回结果
+            Page<PictureVO> cachedPage = JSONUtil.toBean(cachedValue, Page.class);
+            return ResultUtils.success(cachedPage);
+        }
+
+        // 2. 查询分布式缓存（Redis）
+        ValueOperations<String, String> stringStringValueOperations = stringRedisTemplate.opsForValue();
+        cachedValue = stringStringValueOperations.get(cacheKey);
+        if (cachedValue != null) {
+            // 如果缓存命中，返回结果
+            Page<PictureVO> cachedPage = JSONUtil.toBean(cachedValue, Page.class);
+            return ResultUtils.success(cachedPage);
+        }
+
+        // 3.查询数据库
+        Page<Picture> picturePage = pictureService.page(picture, queryWrapper);
+        // 获取封装类
+        Page<PictureVO> pictureVOPage = pictureService.getPictureVOPage(picturePage, request);
+        // 4. 更新缓存
+        String cacheValue = JSONUtil.toJsonStr(pictureVOPage);
+
+        // 写入本地缓存
+        LOCAL_CACHE.put(cacheKey, cacheValue);
+
+        // 写入 Redis 缓存
+        // 5 - 10 分钟随机过期 防止雪崩
+        int expireTime = RandomUtil.randomInt(5, 10) * 60;
+        stringStringValueOperations.set(cacheKey, cacheValue, expireTime,  TimeUnit.SECONDS);
+
+        return ResultUtils.success(pictureVOPage);
     }
 
     @PostMapping("/edit")
