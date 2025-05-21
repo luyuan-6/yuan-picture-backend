@@ -24,8 +24,14 @@ spring:
     database: 0
     host: 127.0.0.1
     port: 6379
-    timeout: 5000
+    timeout: 500
     password: 123456
+  # session 配置
+  session:
+    store-type: redis
+    # session 30 天过期
+    timeout: 2592000
+
 
 
 mybatis-plus:
