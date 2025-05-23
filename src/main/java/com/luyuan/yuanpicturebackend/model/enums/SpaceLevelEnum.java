@@ -23,13 +23,17 @@ public enum SpaceLevelEnum {
         this.maxCount = maxCount;
         this.maxSize = maxSize;
     }
-    public static SpaceLevelEnum getValueByText(Integer  text) {
-        if (ObjUtil.isEmpty(text)) {
+
+    /**
+     * 根据 value 获取枚举
+     */
+    public static SpaceLevelEnum getEnumByValue(Integer value) {
+        if (ObjUtil.isEmpty(value)) {
             return null;
         }
-        for (SpaceLevelEnum value : values()) {
-            if (value.getText().equals(text)) {
-                return value;
+        for (SpaceLevelEnum spaceLevelEnum : SpaceLevelEnum.values()) {
+            if (spaceLevelEnum.value == value) {
+                return spaceLevelEnum;
             }
         }
         return null;

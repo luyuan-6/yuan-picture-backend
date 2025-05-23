@@ -4,7 +4,6 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.text.CharSequenceUtil;
 import cn.hutool.core.util.ObjectUtil;
-import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -14,11 +13,9 @@ import com.luyuan.yuanpicturebackend.Exeception.ThrowUtils;
 import com.luyuan.yuanpicturebackend.mapper.SpaceMapper;
 import com.luyuan.yuanpicturebackend.model.dto.space.SpaceAddRequest;
 import com.luyuan.yuanpicturebackend.model.dto.space.SpaceQueryRequest;
-import com.luyuan.yuanpicturebackend.model.entity.Picture;
 import com.luyuan.yuanpicturebackend.model.entity.Space;
 import com.luyuan.yuanpicturebackend.model.entity.User;
 import com.luyuan.yuanpicturebackend.model.enums.SpaceLevelEnum;
-import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
 import com.luyuan.yuanpicturebackend.model.vo.SpaceVO;
 import com.luyuan.yuanpicturebackend.model.vo.UserVO;
 import com.luyuan.yuanpicturebackend.service.SpaceService;
@@ -54,7 +51,7 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
         // 从对象中取值
         String spaceName = space.getSpaceName();
         Integer spaceLevel = space.getSpaceLevel();
-        SpaceLevelEnum spaceLevelEnum = SpaceLevelEnum.getValueByText(spaceLevel);
+        SpaceLevelEnum spaceLevelEnum = SpaceLevelEnum.getEnumByValue(spaceLevel);
         // 是否要创建
         if (add) {
             ThrowUtils.throwIf(spaceName == null, ErrorCode.PARAMS_ERROR, "空间名称不能为空");
@@ -72,7 +69,7 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
     @Override
     public void fillSpaceBySpaceLevel(Space space) {
         // 根据空间级别，自动填充限额
-        SpaceLevelEnum spaceLevelEnum = SpaceLevelEnum.getValueByText(space.getSpaceLevel());
+        SpaceLevelEnum spaceLevelEnum = SpaceLevelEnum.getEnumByValue(space.getSpaceLevel());
         if (spaceLevelEnum != null) {
             long maxSize = spaceLevelEnum.getMaxSize();
             // 设置默认值
@@ -193,6 +190,14 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
         });
         spaceVOPage.setRecords(spaceVOList);
         return spaceVOPage;
+    }
+
+    @Override
+    public void checkSpaceAuth(User loginUser, Space space) {
+        // 仅本人或管理员可编辑
+        if (!space.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
     }
 }
 

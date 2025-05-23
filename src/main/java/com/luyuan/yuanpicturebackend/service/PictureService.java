@@ -3,14 +3,10 @@ package com.luyuan.yuanpicturebackend.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureQueryRequest;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureReviewRequest;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadByBatchRequest;
-import com.luyuan.yuanpicturebackend.model.dto.picture.PictureUploadRequest;
+import com.luyuan.yuanpicturebackend.model.dto.picture.*;
 import com.luyuan.yuanpicturebackend.model.entity.Picture;
 import com.luyuan.yuanpicturebackend.model.entity.User;
 import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
-import org.springframework.scheduling.annotation.Async;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -92,4 +88,27 @@ public interface PictureService extends IService<Picture> {
      */
     void clearPictureFile(Picture oldPicture);
 
+    /**
+     * 校验空间图片的权限
+     *
+     * @param loginUser
+     * @param picture
+     */
+    void checkPictureAuth(User loginUser, Picture picture);
+
+    /**
+     * 删除照片
+     *
+     * @param pictureId
+     * @param loginUser
+     */
+    void deletePicture(long pictureId, User loginUser);
+
+    /**
+     * 编辑照片
+     *
+     * @param pictureEditRequest
+     * @param pictureEditRequest
+     */
+    void editPicture( PictureEditRequest pictureEditRequest, User loginUser);
 }
