@@ -11,6 +11,8 @@ import com.luyuan.yuanpicturebackend.Exeception.BusinessException;
 import com.luyuan.yuanpicturebackend.Exeception.ErrorCode;
 import com.luyuan.yuanpicturebackend.Exeception.ThrowUtils;
 import com.luyuan.yuanpicturebackend.annotation.AuthCheck;
+import com.luyuan.yuanpicturebackend.api.ImageSearchApiFacade;
+import com.luyuan.yuanpicturebackend.api.model.ImageSearchResult;
 import com.luyuan.yuanpicturebackend.common.BaseResponse;
 import com.luyuan.yuanpicturebackend.common.DeleteRequest;
 import com.luyuan.yuanpicturebackend.common.ResultUtils;
@@ -316,5 +318,38 @@ public class PictureController {
         Integer uploadCount = pictureService.uploadPictureByBatch(pictureUploadByBatchRequest, loginUser);
         return ResultUtils.success(uploadCount);
     }
+
+    /**
+     * 以图搜图
+     */
+    @PostMapping("/search/picture")
+    public BaseResponse<List<ImageSearchResult>> searchPictureByPicture(@RequestBody SearchPictureByPictureRequest searchPictureByPictureRequest) {
+        ThrowUtils.throwIf(searchPictureByPictureRequest == null, ErrorCode.PARAMS_ERROR);
+        Long pictureId = searchPictureByPictureRequest.getPictureId();
+        ThrowUtils.throwIf(pictureId == null || pictureId <= 0, ErrorCode.PARAMS_ERROR);
+        Picture oldPicture = pictureService.getById(pictureId);
+        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        // 防止百度搜索图片时图片格式不支持
+        String url = oldPicture.getUrl() + "?imageMogr2/format/png";
+        List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(url);
+        return ResultUtils.success(resultList);
+    }
+
+    /**
+     * 颜色搜图
+     */
+    @PostMapping("/search/color")
+    public BaseResponse<List<PictureVO>> searchPictureByColor(@RequestBody SearchPictureByColorRequest searchPictureByColorRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(searchPictureByColorRequest == null, ErrorCode.PARAMS_ERROR);
+        Long spaceId = searchPictureByColorRequest.getSpaceId();
+        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR);
+        String picColor = searchPictureByColorRequest.getPicColor();
+        ThrowUtils.throwIf(picColor == null , ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        List<PictureVO> resultList = pictureService.searchPictureByColor(spaceId, picColor, loginUser);
+
+        return ResultUtils.success(resultList);
+    }
+
 
 }

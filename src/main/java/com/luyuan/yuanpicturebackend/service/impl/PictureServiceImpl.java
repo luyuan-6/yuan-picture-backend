@@ -27,6 +27,7 @@ import com.luyuan.yuanpicturebackend.model.vo.UserVO;
 import com.luyuan.yuanpicturebackend.service.PictureService;
 import com.luyuan.yuanpicturebackend.service.SpaceService;
 import com.luyuan.yuanpicturebackend.service.UserService;
+import com.luyuan.yuanpicturebackend.utils.ColorSimilarUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -38,13 +39,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.awt.*;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Date;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -73,7 +73,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
     @Resource
     private TransactionTemplate transactionTemplate;
-
 
 
     @Override
@@ -188,6 +187,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         picture.setPicHeight(uploadPictureResult.getPicHeight());
         picture.setPicScale(uploadPictureResult.getPicScale());
         picture.setPicFormat(uploadPictureResult.getPicFormat());
+        picture.setPicColor(uploadPictureResult.getPicColor());
         picture.setUserId(loginUser.getId());
 
         // 补充审核参数
@@ -201,12 +201,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         transactionTemplate.execute(status -> {
             boolean result = this.saveOrUpdate(picture);
             ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "图片上传失败");
-            if (finalSpaceId != null){
-                boolean update = spaceService.lambdaUpdate()
-                        .eq(Space::getId, finalSpaceId)
-                        .setSql("totalSize = totalSize + " + picture.getPicSize())
-                        .setSql("totalCount = totalCount + 1")
-                        .update();
+            if (finalSpaceId != null) {
+                boolean update = spaceService.lambdaUpdate().eq(Space::getId, finalSpaceId).setSql("totalSize = totalSize + " + picture.getPicSize()).setSql("totalCount = totalCount + 1").update();
                 ThrowUtils.throwIf(!update, ErrorCode.OPERATION_ERROR, "额度更新失败");
             }
             return true;
@@ -239,6 +235,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         Long userId = pictureQueryRequest.getUserId();
         String sortField = pictureQueryRequest.getSortField();
         String sortOrder = pictureQueryRequest.getSortOrder();
+        Date endEditTime = pictureQueryRequest.getEndEditTime();
+        Date startEditTime = pictureQueryRequest.getStartEditTime();
         Integer reviewStatus = pictureQueryRequest.getReviewStatus();
         String reviewMessage = pictureQueryRequest.getReviewMessage();
         Long reviewerId = pictureQueryRequest.getReviewerId();
@@ -263,7 +261,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         queryWrapper.eq(ObjectUtil.isNotEmpty(reviewStatus), "reviewStatus", reviewStatus);
         queryWrapper.like(CharSequenceUtil.isNotBlank(reviewMessage), "reviewMessage", reviewMessage);
         queryWrapper.eq(ObjectUtil.isNotEmpty(reviewerId), "reviewerId", reviewerId);
-
+        // 区间 : startEditTime<= and  < endEditTime
+        queryWrapper.ge(ObjectUtil.isNotEmpty(startEditTime), "editTime", startEditTime);
+        queryWrapper.lt(ObjectUtil.isNotEmpty(endEditTime), "editTime", endEditTime);
         // JSON 数组查询
         if (CollUtil.isNotEmpty(tags)) {
             for (String tag : tags) {
@@ -463,7 +463,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             if (!userService.isAdmin(loginUser) && !loginUser.getId().equals(picture.getUserId())) {
                 throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
             }
-        }else {
+        } else {
             // 私有空间，仅空间管理员可操作
             if (!picture.getUserId().equals(loginUser.getId())) {
                 throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
@@ -487,15 +487,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 //        boolean result = this.removeById(pictureId);
 //        ThrowUtils.throwIf(!result, ErrorCode.PARAMS_ERROR, "删除图片失败");
         transactionTemplate.execute(status -> {
-        boolean result = this.removeById(pictureId);
-        ThrowUtils.throwIf(!result, ErrorCode.PARAMS_ERROR, "删除图片失败");
+            boolean result = this.removeById(pictureId);
+            ThrowUtils.throwIf(!result, ErrorCode.PARAMS_ERROR, "删除图片失败");
             Long spaceId = oldPicture.getSpaceId();
-            if (spaceId != null){
-                boolean deleteResult = spaceService.lambdaUpdate()
-                        .eq(Space::getId, spaceId)
-                        .setSql("totalSize = totalSize - " + oldPicture.getPicSize())
-                        .setSql("totalCount = totalCount - 1")
-                        .update();
+            if (spaceId != null) {
+                boolean deleteResult = spaceService.lambdaUpdate().eq(Space::getId, spaceId).setSql("totalSize = totalSize - " + oldPicture.getPicSize()).setSql("totalCount = totalCount - 1").update();
                 ThrowUtils.throwIf(!deleteResult, ErrorCode.OPERATION_ERROR, "额度更新失败");
             }
             return true;
@@ -512,6 +508,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         BeanUtil.copyProperties(pictureEditRequest, picture);
         // 转换tags list
         picture.setTags(JSONUtil.toJsonStr(pictureEditRequest.getTags()));
+        // 设置编辑时间
+        picture.setEditTime(new Date());
         // 数据校验
         this.validPicture(picture);
         // 查库校验图片是否存在
@@ -531,6 +529,41 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         boolean result = this.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
     }
+
+    @Override
+    public List<PictureVO> searchPictureByColor(Long spaceId, String picColor, User loginUser) {
+        // 1. 校验参数是否合法
+        ThrowUtils.throwIf(spaceId == null || spaceId <= 0, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(picColor == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
+        // 2. 校验空间权限
+        Space space = spaceService.getById(spaceId);
+        ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR);
+        // 3. 查询该空间下所有图片(必须有主色调)
+        List<Picture> pictureList = this.lambdaQuery()
+                .eq(Picture::getSpaceId, spaceId)
+                .isNotNull(Picture::getPicColor).list();
+        // 如果没有图片，直接返回空列表
+        if (pictureList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // 将目标颜色转为 Color 对象
+        Color targetColor = Color.decode(picColor);
+        //4. 计算相似度并排序
+        pictureList.stream().sorted(Comparator.comparingDouble(picture -> {
+            // 提取图片主色调
+            String hexColor = picture.getPicColor();
+            if (CharSequenceUtil.isBlank(hexColor)) {
+                return Double.MAX_VALUE;
+            }
+            Color pictureColor = Color.decode(hexColor);
+            // 越大越相似 负号取反
+            return -ColorSimilarUtils.calculateSimilarity(pictureColor, targetColor);
+        })).limit(12).collect(Collectors.toList());
+        // 转换为脱敏的 VO
+        return pictureList.stream().map(PictureVO::objToVo).collect(Collectors.toList());
+    }
+
 }
 
 

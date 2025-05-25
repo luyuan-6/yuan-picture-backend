@@ -9,6 +9,7 @@ import com.luyuan.yuanpicturebackend.model.entity.User;
 import com.luyuan.yuanpicturebackend.model.vo.PictureVO;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * @author luyuan
@@ -111,4 +112,13 @@ public interface PictureService extends IService<Picture> {
      * @param pictureEditRequest
      */
     void editPicture( PictureEditRequest pictureEditRequest, User loginUser);
+
+    /**
+     * 颜色搜索
+     * @param spaceId
+     * @param picColor
+     * @param loginUser
+     * @return
+     */
+    List<PictureVO> searchPictureByColor(Long spaceId, String picColor, User loginUser);
 }
