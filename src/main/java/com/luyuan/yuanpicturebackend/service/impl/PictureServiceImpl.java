@@ -393,7 +393,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
 
             if (CharSequenceUtil.isNotBlank(pictureUploadByBatchRequest.getNamePrefix())) {
-                pictureUploadRequest.setPicName(pictureUploadByBatchRequest.getNamePrefix() + "_" + uploadSuccessCount + 1);
+                pictureUploadRequest.setPicName(pictureUploadByBatchRequest.getNamePrefix() + "_" + (uploadSuccessCount + 1));
             }
             if (CharSequenceUtil.isNotBlank(pictureUploadByBatchRequest.getCategory())) {
                 pictureUploadRequest.setCategory(pictureUploadByBatchRequest.getCategory());

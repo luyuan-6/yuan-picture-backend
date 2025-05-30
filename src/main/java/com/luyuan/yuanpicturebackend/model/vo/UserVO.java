@@ -59,5 +59,47 @@ public class UserVO implements Serializable {
      */
     private Date createTime;
 
+    /**
+     * 用户个人网站
+     */
+    private String website;
+
+
+    /**
+     * 用户电话号码
+     */
+    private String phone;
+
+    /**
+     * 用户邮箱
+     */
+    private String email;
+
+    /**
+     * 用户创作领域
+     */
+    private String field;
+
+    /**
+     * 用户性别
+     */
+    private String gender;
+
+    /**
+     * 用户个人信息背景
+     */
+    private String coverImage;
+
+    /**
+     * 用户专业技能(json 数组)
+     */
+    private String skills;
+
+    /**
+     * 用户擅长素材分类(json 数组)
+     */
+    private String categories;
+
+
 
 }

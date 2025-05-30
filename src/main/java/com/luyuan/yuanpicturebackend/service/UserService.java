@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.luyuan.yuanpicturebackend.model.dto.user.UserLoginRequest;
 import com.luyuan.yuanpicturebackend.model.dto.user.UserQueryRequest;
 import com.luyuan.yuanpicturebackend.model.dto.user.UserRegisterRequest;
+import com.luyuan.yuanpicturebackend.model.dto.user.UserUpdateRequest;
 import com.luyuan.yuanpicturebackend.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.luyuan.yuanpicturebackend.model.vo.LoginUserVO;
@@ -25,6 +26,13 @@ public interface UserService extends IService<User> {
      * @return
      */
     long userRegister(UserRegisterRequest userRegisterRequest);
+
+    /**
+     * 用户更新个人信息
+     * @param userUpdateRequest
+     * @return
+     */
+    boolean userUpdatePersonalInfo(UserUpdateRequest userUpdateRequest, HttpServletRequest request);
 
     /**
      * 用户登录

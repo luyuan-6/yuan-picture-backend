@@ -22,6 +22,26 @@ create table if not exists user
     INDEX idx_userName (userName)
     ) comment '用户' collate = utf8mb4_unicode_ci;
 
+ALTER TABLE user
+    ADD COLUMN coverImage varchar(1024) null comment '个人信息背景',
+    ADD COLUMN email varchar(256) null comment '邮箱',
+    ADD COLUMN gender varchar(16) null comment '性别',
+    ADD COLUMN field varchar(16) null comment '创作领域',
+    ADD COLUMN phone varchar(16) null comment '电话号码',
+    ADD COLUMN website varchar(512) null comment '个人网站'
+;
+
+ALTER TABLE user
+    MODIFY field varchar(64) null comment '创作领域',
+    MODIFY phone varchar(32) null comment '电话号码';
+
+
+ALTER TABLE user
+    ADD COLUMN skills varchar(512) null comment '个人技能（JSON 数组）',
+    ADD COLUMN categories varchar(256) null comment '擅长素材分类'
+;
+
+
 -- 图片表
 create table if not exists picture
 (

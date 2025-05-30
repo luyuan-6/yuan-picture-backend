@@ -71,6 +71,16 @@ public class UserController {
     }
 
     /**
+     * 用户修改个人信息
+     */
+    @PostMapping("/update/personalInfo")
+    public BaseResponse<Boolean> userUpdatePersonalInfo(@RequestBody UserUpdateRequest userUpdateRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(userUpdateRequest == null, ErrorCode.PARAMS_ERROR);
+        boolean result = userService.userUpdatePersonalInfo(userUpdateRequest, request);
+        return ResultUtils.success(result);
+    }
+
+    /**
      * 创建用户
      * @param userAddRequest
      * @return
@@ -89,6 +99,8 @@ public class UserController {
         ThrowUtils.throwIf(!save, ErrorCode.PARAMS_ERROR, "注册失败, 数据插入失败");
         return ResultUtils.success(user.getId());
     }
+
+
     /**
      * 根据id获取用户(仅管理员)
      * @param id
@@ -116,7 +128,6 @@ public class UserController {
      * @return
      */
     @PostMapping("/get/vo")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<UserVO> getUserVOById(@RequestParam(required = false) Long id) {
         // 先判空
         if (id == null) {

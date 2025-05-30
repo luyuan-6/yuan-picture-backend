@@ -12,6 +12,14 @@
             <result property="userAvatar" column="userAvatar" jdbcType="VARCHAR"/>
             <result property="userProfile" column="userProfile" jdbcType="VARCHAR"/>
             <result property="userRole" column="userRole" jdbcType="VARCHAR"/>
+            <result property="coverImage" column="coverImage" jdbcType="VARCHAR"/>
+            <result property="email" column="email" jdbcType="VARCHAR"/>
+            <result property="gender" column="gender" jdbcType="VARCHAR"/>
+            <result property="field" column="field" jdbcType="VARCHAR"/>
+            <result property="phone" column="phone" jdbcType="VARCHAR"/>
+            <result property="website" column="website" jdbcType="VARCHAR"/>
+            <result property="skills" column="website" jdbcType="VARCHAR"/>
+            <result property="categories" column="website" jdbcType="VARCHAR"/>
             <result property="editTime" column="editTime" jdbcType="TIMESTAMP"/>
             <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
@@ -19,9 +27,9 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,userAccount,userPassword,
+        id,userAccount,userPassword,coverImage,email,gender,field,phone,website,
         userName,userAvatar,userProfile,
-        userRole,editTime,createTime,
+        userRole,editTime,createTime,skills,categories,
         updateTime,isDelete
     </sql>
 </mapper>
